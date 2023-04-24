@@ -1,0 +1,138 @@
+
+--original dataset
+SELECT * FROM public.investment;
+
+SELECT * FROM public.investment
+WHERE market LIKE 'Fin%';
+
+SELECT * FROM public.investment
+WHERE market = 'FincialServices';
+
+--creating table for financial services from dataset
+
+CREATE TABLE finserv_new AS SELECT * FROM public.investment
+WHERE market = 'FincialServices';
+
+--handling wrong spelling,turning all text to lowercase
+
+SELECT * FROM public.finserv_new;
+
+UPDATE public.finserv_new
+SET market =LOWER(market);
+
+UPDATE public.finserv_new
+SET market = 'financialservices'
+WHERE market = 'fincialservices';
+
+--handling duplicate data
+
+SELECT funding_total_usd,status,country_code,founded_year,seed FROM public.finserv_new
+GROUP BY funding_total_usd,status,country_code,founded_year,seed
+HAVING COUNT (*)>1;
+
+
+SELECT * FROM public.finserv_new
+WHERE funding_total_usd=150000 AND status= 'operating' AND country_code='USA' 
+AND founded_year =2013 AND seed =150000;
+
+--delete all the result of duplicate data
+
+DELETE FROM public.finserv_new
+WHERE funding_total_usd=150000 AND status= 'operating' AND country_code='USA' 
+AND founded_year =2013 AND seed =150000;
+
+--reinsert the deleted data to have only one data
+
+INSERT INTO public.finserv_new(market,funding_total_usd,status,country_code,founded_year,seed,venture,
+							   equity_crowdfunding,undisclosed,convertible_note,debt_fincing,private_equity)
+VALUES ('financialservices',150000,'operating','USA',2013,150000,0,0,0,0,0,0)  ; 
+
+
+--WHAT YOU NEED TO DO
+
+--1A)Provide descriptive analytics that presents the number of observations of companies operating in financial services?
+--answer: total of 99 companies operating in financial services
+
+SELECT market,COUNT(status)AS companies_operating_in_financial_services 
+FROM public.finserv_new
+WHERE status = 'operating'
+GROUP BY market;
+
+--1B) average seed funding
+--answer: 474725.71 average seed funding
+
+SELECT market,ROUND(AVG(seed),2) AS average_seed_funding 
+FROM public.finserv_new
+GROUP BY market;
+
+--1C)the standard deviation for the seed funding–both minimum and maximum?
+
+SELECT funding_total_usd,seed,(seed-AVG(seed)OVER())/ STDDEV (seed)OVER() AS ZSCORE_SEED  
+FROM public.finserv_new
+ORDER BY ZSCORE_SEED ;
+
+
+
+--2A)determine whether there has been a previous instance where a start-up company offering financial services received equity crowdfunding?
+
+--option1
+
+SELECT funding_total_usd,founded_year,equity_crowdfunding
+FROM public.finserv_new
+
+--option2
+SELECT DISTINCT equity_crowdfunding 
+FROM public.finserv_new;
+
+
+--2B)provide details of the company such as the country it operates in, the year it was founded, its status
+--(whether or not it is still operating), and the amount of equity crowdfunding it acquired
+
+--viewing all the information about equity_crowdfunding
+
+SELECT * FROM public.finserv_new
+WHERE equity_crowdfunding =398097;
+
+--3)Determine whether a significant outlier in terms of total funding (USD) exists among companies that offer financial
+--services. Provide details pertaining to this outlier such as its country, status, year founded, and total funding (USD)
+
+SELECT funding_total_usd,(funding_total_usd-AVG(funding_total_usd)
+						  OVER())/STDDEV (funding_total_usd)OVER()
+						  AS zscore_funding_total_usd 
+						  FROM  public.finserv_new;
+
+--finding the significant outlier from funding_total_usd
+--answer: funding_total_usd=725000000,status =operating,country_code = USA,founded_year = null
+
+
+SELECT * FROM (SELECT funding_total_usd,(funding_total_usd-AVG(funding_total_usd)
+						  OVER())/STDDEV (funding_total_usd)OVER()
+						  AS zscore_funding_total_usd 
+						  FROM  public.finserv_new)AS outlier_funding_total_usd
+						  WHERE zscore_funding_total_usd >2.576 OR zscore_funding_total_usd < -2.576;
+
+
+
+--4)Excluding the significant outlier, provide insights on the company in terms of the usual 
+--sources of financing for businesses that offer financial services
+
+SELECT * FROM public.finserv_new
+WHERE funding_total_usd = 725000000;
+
+DELETE FROM public.finserv_new
+WHERE funding_total_usd = 725000000;
+
+
+
+
+
+
+
+
+
+/*INSERT INTO public.finserv_new (market,funding_total_usd,status,country_code,founded_year,seed,venture,
+							   equity_crowdfunding,undisclosed,convertible_note,debt_fincing,private_equity)
+VALUES ('financialservices',725000000,'operating','USA',NULL,0,0,0,0,0,0,0);
+
+CREATE TABLE sub_finserv_new  AS SELECT * FROM public.finserv_new */
+
